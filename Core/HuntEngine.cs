@@ -1,4 +1,5 @@
 using System.Numerics;
+using Dalamud.Game.ClientState.Conditions;
 using HuntAutomator.Data;
 using HuntAutomator.Integrations;
 using HuntAutomator.Models;
@@ -10,7 +11,7 @@ namespace HuntAutomator.Core;
 public enum EngineState
 {
     Idle, Planning, Teleporting, WaitingForZone, Navigating, Searching,
-    Patrolling, Fighting, Confirming, Recovering, Finished, Error
+    Mounting, Patrolling, Fighting, Confirming, Recovering, Finished, Error
 }
 
 internal sealed class HuntEngine
@@ -28,6 +29,7 @@ internal sealed class HuntEngine
     private int retries;
     private int startingKillCount;
     private Vector3? currentPatrolPoint;
+    private DateTime? zoneReadySince;
 
     public EngineState State { get; private set; } = EngineState.Idle;
     public string Status { get; private set; } = "Idle";
@@ -89,6 +91,7 @@ internal sealed class HuntEngine
         queue.Clear();
         patrol.Clear();
         currentPatrolPoint = null;
+        zoneReadySince = null;
         current = null;
         State = EngineState.Idle;
         Status = "Idle";
@@ -153,6 +156,7 @@ internal sealed class HuntEngine
             State = EngineState.Teleporting;
             Status = $"Teleporting for {current.Name}";
             stateSince = DateTime.UtcNow;
+            zoneReadySince = null;
             if (!tp.TeleportToTerritory(current.TerritoryId))
             {
                 FailOrRetry("No usable aetheryte / Teleporter IPC failed");
@@ -254,11 +258,26 @@ internal sealed class HuntEngine
         }
 
         currentPatrolPoint = next;
+        if (cfg.PreferFlying && !Service.Condition[ConditionFlag.Mounted])
+        {
+            State = EngineState.Mounting;
+            Status = $"Mounting to fly to {current.Name}";
+            stateSince = DateTime.UtcNow;
+            if (!Service.CommandManager.ProcessCommand("/gaction \"Mount Roulette\""))
+                StartPatrolMovement(false);
+            return;
+        }
+
+        StartPatrolMovement(cfg.PreferFlying);
+    }
+
+    private void StartPatrolMovement(bool fly)
+    {
+        if (current is null || currentPatrolPoint is not { } next) return;
         State = EngineState.Patrolling;
-        Status = $"Patrolling for {current.Name} ({PatrolPointsRemaining} points remain)";
+        Status = $"Patrolling for {current.Name} ({PatrolPointsRemaining} points remain){(fly ? " by air" : " on foot")}";
         stateSince = DateTime.UtcNow;
-        if (!nav.MoveTo(next, cfg.PreferFlying, 12f))
-            MoveNextPatrolPoint();
+        if (!nav.MoveTo(next, fly, 12f)) MoveNextPatrolPoint();
     }
 
     public void Tick()
@@ -283,11 +302,40 @@ internal sealed class HuntEngine
         {
             if (Service.ClientState.TerritoryType == current.TerritoryId)
             {
-                // Give object table/navmesh a moment after loading.
-                if ((now - stateSince).TotalSeconds >= 2) PrepareSearch();
+                // The territory changes before its navmesh is necessarily loaded. Require
+                // two continuous ready seconds before querying or starting movement.
+                if (!nav.IsReady())
+                {
+                    zoneReadySince = null;
+                    Status = $"Waiting for navmesh in {current.Name}'s zone";
+                    if ((now - stateSince).TotalSeconds > 45)
+                        FailOrRetry("Navmesh did not become ready after teleport");
+                }
+                else
+                {
+                    zoneReadySince ??= now;
+                    Status = $"Waiting for {current.Name}'s zone to settle";
+                    if ((now - zoneReadySince.Value).TotalSeconds >= 2)
+                    {
+                        zoneReadySince = null;
+                        PrepareSearch();
+                    }
+                }
             }
             else if ((now - stateSince).TotalSeconds > 45)
                 FailOrRetry("Zone load timeout");
+            return;
+        }
+
+        if (State == EngineState.Mounting)
+        {
+            if (Service.Condition[ConditionFlag.Mounted])
+                StartPatrolMovement(true);
+            else if ((now - stateSince).TotalSeconds > 5)
+            {
+                Service.Log.Warning("Could not mount for {Name}; using a ground route.", current.Name);
+                StartPatrolMovement(false);
+            }
             return;
         }
 
