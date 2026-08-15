@@ -10,7 +10,7 @@
     "Punchline": "Automated hunt bill orchestration.",
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/YOUR_GITHUB_USER/HuntAutomator/releases/download/v0.2.0/HuntAutomator.zip",
-    "DownloadLinkUpdate": "https://github.com/YOUR_GITHUB_USER/HuntAutomator/releases/download/v0.2.0/HuntAutomator.zip"
+    "DownloadLinkInstall": "https://github.com/Antipokemon/HuntAutomator/releases/download/v0.2.0/HuntAutomator.zip",
+    "DownloadLinkUpdate": "https://github.com/Antipokemon/HuntAutomator/releases/download/v0.2.0/HuntAutomator.zip"
   }
 ]
