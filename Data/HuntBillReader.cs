@@ -17,22 +17,21 @@ internal static class HuntBillReader
         var typeSheet = Service.DataManager.Excel.GetSheet<MobHuntOrderType>();
         if (orderSheet is null || typeSheet is null) return result;
 
-        // Current game uses fewer slots, but reading the fixed client arrays safely through known MobHunt order IDs.
-        for (byte bill = 0; bill < 22; bill++)
+        for (byte bill = 0; bill < MobHunt.MaxMarkIndex; bill++)
         {
-            if ((mh->ObtainedFlags & (1 << bill)) == 0) continue;
+            if (!mh->IsMarkBillObtained(bill)) continue;
 
             MobHuntOrderType type;
             try { type = typeSheet.GetRow(bill); }
             catch { continue; }
 
-            if (type.OrderStart.ValueNullable is not { } start) continue;
-            var markId = mh->ObtainedMarkId[(int)type.RowId];
-            if (markId == 0) continue;
-            var rowId = start.RowId + (uint)(markId - 1);
+            // Mark indexes are not ordered like the sheet (ARR elite was inserted after
+            // Heavensward). Let the client resolve the currently obtained order row.
+            var rowId = mh->GetObtainedHuntOrderRowId(bill);
+            if (rowId <= 0) continue;
 
             IEnumerable<MobHuntOrder> rows;
-            try { rows = orderSheet[rowId]; }
+            try { rows = orderSheet[(uint)rowId]; }
             catch { continue; }
 
             foreach (var order in rows)

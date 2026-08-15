@@ -128,7 +128,7 @@ internal sealed class HuntEngine
         if (!queue.TryDequeue(out current))
         {
             State = EngineState.Finished;
-            Status = "All queued hunts complete.";
+            Status = "No eligible incomplete hunt bills or live HuntHelper marks found.";
             return;
         }
 
