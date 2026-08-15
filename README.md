@@ -9,7 +9,7 @@ Experimental Dalamud API 15 hunt-orchestration plugin.
 After this project has been pushed to a public GitHub repository and its first release workflow has completed, add the generated custom repository URL in Dalamud:
 
 ```text
-https://raw.githubusercontent.com/Antipokemon/HuntAutomator/plugin-repo/repo.json
+https://raw.githubusercontent.com/Antipokemon/HuntAutomator/main/repo.json
 ```
 
 Then open `/xlplugins`, search for **Hunt Automator**, and install it normally.
