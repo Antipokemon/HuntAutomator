@@ -1,0 +1,16 @@
+[
+  {
+    "Author": "Antipokemon",
+    "Name": "Hunt Automator",
+    "InternalName": "HuntAutomator",
+    "AssemblyVersion": "0.2.0.0",
+    "Description": "Automates FFXIV hunt bills using vnavmesh, RotationSolverReborn, Teleporter, and optional HuntHelper integration.",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 15,
+    "Punchline": "Automated hunt bill orchestration.",
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadLinkInstall": "https://github.com/YOUR_GITHUB_USER/HuntAutomator/releases/download/v0.2.0/HuntAutomator.zip",
+    "DownloadLinkUpdate": "https://github.com/YOUR_GITHUB_USER/HuntAutomator/releases/download/v0.2.0/HuntAutomator.zip"
+  }
+]
