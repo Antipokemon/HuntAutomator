@@ -263,8 +263,13 @@ internal sealed class HuntEngine
             State = EngineState.Mounting;
             Status = $"Mounting to fly to {current.Name}";
             stateSince = DateTime.UtcNow;
-            if (!Service.CommandManager.ProcessCommand("/gaction \"Mount Roulette\""))
+            if (!MountController.TryMount())
+            {
+                Service.Log.Warning("Mount Roulette could not be started for {Name}; using a ground route.", current.Name);
                 StartPatrolMovement(false);
+            }
+            else
+                Service.Log.Information("Mounting for flying route to {Name}.", current.Name);
             return;
         }
 
