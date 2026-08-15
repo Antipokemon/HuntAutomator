@@ -51,13 +51,31 @@ jobs:
           $xml = $xml -replace '<Version>[^<]+</Version>', '<Version>${{ steps.version.outputs.assembly }}</Version>'
           Set-Content $path $xml -NoNewline
 
-      - name: Set repository URL in plugin manifest
+      - name: Prepare plugin manifest
         shell: pwsh
         run: |
           $path = 'HuntAutomator.json'
           $manifest = Get-Content $path -Raw | ConvertFrom-Json
-          $manifest | Add-Member -NotePropertyName RepoUrl -NotePropertyValue "https://github.com/${{ github.repository }}" -Force
+
+          $manifest | Add-Member `
+            -NotePropertyName RepoUrl `
+            -NotePropertyValue "https://github.com/${{ github.repository }}" `
+            -Force
+
+          $manifest | Add-Member `
+            -NotePropertyName AssemblyVersion `
+            -NotePropertyValue '${{ steps.version.outputs.assembly }}' `
+            -Force
+
+          $manifest | Add-Member `
+            -NotePropertyName LoadPriority `
+            -NotePropertyValue 0 `
+            -Force
+
           $manifest | ConvertTo-Json -Depth 20 | Set-Content $path
+
+          Write-Host 'Generated plugin manifest:'
+          Get-Content $path
 
       - name: Install .NET
         uses: actions/setup-dotnet@v5
@@ -153,7 +171,7 @@ jobs:
           }
 
           New-Item -ItemType Directory -Force repo-publish | Out-Null
-          @($entry) | ConvertTo-Json -Depth 20 | Set-Content repo-publish/repo.json
+          $entry | ConvertTo-Json -Depth 20 -AsArray | Set-Content repo-publish/repo.json
 
       - name: Publish repo.json to plugin-repo branch
         shell: pwsh
