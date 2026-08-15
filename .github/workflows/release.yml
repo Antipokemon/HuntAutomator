@@ -78,28 +78,37 @@ jobs:
         id: package
         shell: pwsh
         run: |
-          $buildDir = Join-Path $PWD 'bin\x64\Release\HuntAutomator'
+          $buildDir = Join-Path $PWD 'bin\Release'
+
           if (-not (Test-Path $buildDir)) {
-            throw "Expected Dalamud build output not found: $buildDir"
+            throw "Expected build output not found: $buildDir"
           }
 
-          $packagerZip = Get-ChildItem $buildDir -File -Filter '*.zip' |
-            Where-Object { $_.Name -match 'latest|HuntAutomator' } |
-            Select-Object -First 1
+          $dll = Join-Path $buildDir 'HuntAutomator.dll'
+          if (-not (Test-Path $dll)) {
+            throw "HuntAutomator.dll not found: $dll"
+          }
+
+          $stage = Join-Path $env:RUNNER_TEMP 'HuntAutomator-package'
+          Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $stage | Out-Null
+
+          Copy-Item $dll $stage
+
+          $manifest = Join-Path $PWD 'HuntAutomator.json'
+          if (Test-Path $manifest) {
+            Copy-Item $manifest $stage
+          }
 
           $out = Join-Path $PWD 'HuntAutomator.zip'
-          if ($packagerZip) {
-            Copy-Item $packagerZip.FullName $out -Force
-          } else {
-            $stage = Join-Path $env:RUNNER_TEMP 'HuntAutomator-package'
-            New-Item -ItemType Directory -Force $stage | Out-Null
-            Get-ChildItem $buildDir -File |
-              Where-Object { $_.Extension -ne '.zip' } |
-              Copy-Item -Destination $stage
-            Compress-Archive -Path "$stage\*" -DestinationPath $out -Force
+          Compress-Archive -Path "$stage\*" -DestinationPath $out -Force
+
+          if (-not (Test-Path $out)) {
+            throw 'HuntAutomator.zip was not created.'
           }
 
-          if (-not (Test-Path $out)) { throw 'HuntAutomator.zip was not created.' }
+          Write-Host "Created package: $out"
+          Get-ChildItem $stage
           "zip=$out" >> $env:GITHUB_OUTPUT
 
       - name: Create or update GitHub release
