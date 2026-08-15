@@ -33,9 +33,9 @@ jobs:
         run: dotnet build HuntAutomator.csproj --configuration Release
 
       - name: Upload build output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: HuntAutomator-build
-          path: .\bin\x64\Release\HuntAutomator\*
+          path: .\bin\Release\*
           if-no-files-found: error
           retention-days: 7
