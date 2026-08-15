@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+latest.zip
+HuntAutomator.zip
+repo-publish/

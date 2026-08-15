@@ -1,0 +1,13 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.2.0.0</Version>
+    <Author>HuntAutomator contributors</Author>
+    <Name>Hunt Automator</Name>
+    <Punchline>Orchestrates hunt bills, hunt routing, and combat.</Punchline>
+    <Description>Automates selected hunt workflows using vnavmesh, RotationSolverReborn, Teleporter, and optional HuntHelper integration.</Description>
+    <Tags>hunt;automation;vnavmesh;combat</Tags>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+</Project>

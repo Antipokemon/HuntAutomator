@@ -1,0 +1,169 @@
+name: Release and Publish Custom Repository
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, for example 0.2.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $raw = '${{ inputs.version }}'.Trim()
+            $tag = if ($raw.StartsWith('v')) { $raw } else { "v$raw" }
+          } else {
+            $tag = '${{ github.ref_name }}'
+            $raw = $tag.TrimStart('v')
+          }
+
+          $parts = $raw.Split('.')
+          if ($parts.Count -eq 3) { $assembly = "$raw.0" }
+          elseif ($parts.Count -eq 4) { $assembly = $raw }
+          else { throw "Version must contain 3 or 4 numeric components, e.g. 0.2.0 or 0.2.0.0" }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "display=$raw" >> $env:GITHUB_OUTPUT
+          "assembly=$assembly" >> $env:GITHUB_OUTPUT
+
+      - name: Set build version
+        shell: pwsh
+        run: |
+          $path = 'HuntAutomator.csproj'
+          $xml = Get-Content $path -Raw
+          $xml = $xml -replace '<Version>[^<]+</Version>', '<Version>${{ steps.version.outputs.assembly }}</Version>'
+          Set-Content $path $xml -NoNewline
+
+      - name: Set repository URL in plugin manifest
+        shell: pwsh
+        run: |
+          $path = 'HuntAutomator.json'
+          $manifest = Get-Content $path -Raw | ConvertFrom-Json
+          $manifest | Add-Member -NotePropertyName RepoUrl -NotePropertyValue "https://github.com/${{ github.repository }}" -Force
+          $manifest | ConvertTo-Json -Depth 20 | Set-Content $path
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download Dalamud
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+          Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+
+      - name: Build release
+        shell: pwsh
+        run: dotnet build HuntAutomator.csproj --configuration Release
+
+      - name: Prepare plugin ZIP
+        id: package
+        shell: pwsh
+        run: |
+          $buildDir = Join-Path $PWD 'bin\x64\Release\HuntAutomator'
+          if (-not (Test-Path $buildDir)) {
+            throw "Expected Dalamud build output not found: $buildDir"
+          }
+
+          $packagerZip = Get-ChildItem $buildDir -File -Filter '*.zip' |
+            Where-Object { $_.Name -match 'latest|HuntAutomator' } |
+            Select-Object -First 1
+
+          $out = Join-Path $PWD 'HuntAutomator.zip'
+          if ($packagerZip) {
+            Copy-Item $packagerZip.FullName $out -Force
+          } else {
+            $stage = Join-Path $env:RUNNER_TEMP 'HuntAutomator-package'
+            New-Item -ItemType Directory -Force $stage | Out-Null
+            Get-ChildItem $buildDir -File |
+              Where-Object { $_.Extension -ne '.zip' } |
+              Copy-Item -Destination $stage
+            Compress-Archive -Path "$stage\*" -DestinationPath $out -Force
+          }
+
+          if (-not (Test-Path $out)) { throw 'HuntAutomator.zip was not created.' }
+          "zip=$out" >> $env:GITHUB_OUTPUT
+
+      - name: Create or update GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $exists = gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag HuntAutomator.zip --clobber
+          } else {
+            gh release create $tag HuntAutomator.zip --title "HuntAutomator $tag" --generate-notes --target '${{ github.sha }}'
+          }
+
+      - name: Generate custom-repository manifest
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $assembly = '${{ steps.version.outputs.assembly }}'
+          $repo = '${{ github.repository }}'
+          $download = "https://github.com/$repo/releases/download/$tag/HuntAutomator.zip"
+          $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds().ToString()
+
+          $entry = [ordered]@{
+            Author = 'HuntAutomator contributors'
+            Name = 'Hunt Automator'
+            InternalName = 'HuntAutomator'
+            AssemblyVersion = $assembly
+            TestingAssemblyVersion = $null
+            RepoUrl = "https://github.com/$repo"
+            ApplicableVersion = 'any'
+            DalamudApiLevel = 15
+            Punchline = 'Orchestrates hunt bills, hunt routing, and combat.'
+            Description = 'Automates selected daily hunt bills, weekly B-ranks, and optional HuntHelper A-rank trains using vnavmesh and RotationSolverReborn.'
+            Tags = @('hunt', 'automation', 'vnavmesh', 'combat')
+            IsHide = $false
+            IsTestingExclusive = $false
+            DownloadLinkInstall = $download
+            DownloadLinkUpdate = $download
+            LastUpdate = $now
+          }
+
+          New-Item -ItemType Directory -Force repo-publish | Out-Null
+          @($entry) | ConvertTo-Json -Depth 20 | Set-Content repo-publish/repo.json
+
+      - name: Publish repo.json to plugin-repo branch
+        shell: pwsh
+        run: |
+          Push-Location repo-publish
+          git init
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b plugin-repo
+          git add repo.json
+          git commit -m 'Publish HuntAutomator ${{ steps.version.outputs.tag }}'
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push --force origin plugin-repo
+          Pop-Location
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          $owner = '${{ github.repository_owner }}'
+          $repoName = '${{ github.event.repository.name }}'
+          "### Custom repository URL" >> $env:GITHUB_STEP_SUMMARY
+          "``https://raw.githubusercontent.com/$owner/$repoName/plugin-repo/repo.json``" >> $env:GITHUB_STEP_SUMMARY
