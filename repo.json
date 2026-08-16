@@ -1,0 +1,25 @@
+[
+  {
+    "Author": "HuntAutomator contributors",
+    "Name": "Hunt Automator",
+    "InternalName": "HuntAutomator",
+    "AssemblyVersion": "0.2.7.0",
+    "TestingAssemblyVersion": null,
+    "RepoUrl": "https://github.com/Antipokemon/HuntAutomator",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 15,
+    "Punchline": "Orchestrates hunt bills, hunt routing, and combat.",
+    "Description": "Automates selected daily hunt bills, weekly B-ranks, and optional HuntHelper A-rank trains using vnavmesh and RotationSolverReborn.",
+    "Tags": [
+      "hunt",
+      "automation",
+      "vnavmesh",
+      "combat"
+    ],
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadLinkInstall": "https://github.com/Antipokemon/HuntAutomator/releases/download/v0.2.7/HuntAutomator.zip",
+    "DownloadLinkUpdate": "https://github.com/Antipokemon/HuntAutomator/releases/download/v0.2.7/HuntAutomator.zip",
+    "LastUpdate": "1786842352"
+  }
+]
