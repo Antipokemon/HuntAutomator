@@ -60,7 +60,7 @@ internal static class HuntBillReader
                     (byte)order.SubrowId,
                     elite ? 1 : order.NeededKills,
                     currentKills,
-                    DailyLocationDatabase.TryGet(mobId, out var pos) ? pos : null));
+                    DailyLocationDatabase.GetPositions(mobId)));
             }
         }
 

@@ -15,7 +15,7 @@ public sealed record HuntTarget(
     byte MobIndex,
     int NeededKills,
     int CurrentKills,
-    Vector2? MapPosition = null)
+    IReadOnlyList<Vector2>? MapPositions = null)
 {
     public int RemainingKills => Kind == HuntKind.Daily ? Math.Max(0, NeededKills - CurrentKills) : 1;
 }

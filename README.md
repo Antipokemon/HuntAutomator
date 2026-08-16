@@ -21,9 +21,9 @@ See [CUSTOM_REPOSITORY.md](CUSTOM_REPOSITORY.md) for the one-time GitHub setup a
 - Reads currently accepted daily clan/mark bills directly from the game's `MobHunt` state and Lumina `MobHuntOrder` data.
 - Reads weekly elite/B-rank bills the same way.
 - Groups targets into a queue and automatically changes zones with Teleporter IPC.
-- Uses known daily-mark map coordinates as a fast path where bundled, then falls back to a deterministic full-map patrol.
+- Searches every bundled spawn cluster for a daily mark as a fast path, then falls back to a deterministic full-map patrol.
 - B-ranks use a full-map patrol because an elite mark can occupy many spawn points.
-- Continuously scans `IObjectTable` by `NameId`; navigation stops as soon as the target is visible.
+- Continuously scans `IObjectTable` by `NameId`; once visible, selects the target and navigates into the configured combat range.
 - Uses vnavmesh to snap patrol points to the navmesh and path to them.
 - Targets the mob and starts RotationSolverReborn in Manual mode; stops RSR after the kill or timeout.
 - Verifies daily completion from the game's hunt-bill kill counter rather than assuming a despawn means credit.

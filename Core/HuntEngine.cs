@@ -29,6 +29,7 @@ internal sealed class HuntEngine
     private int retries;
     private int startingKillCount;
     private Vector3? currentPatrolPoint;
+    private Vector3? currentTargetPosition;
     private DateTime? zoneReadySince;
 
     public EngineState State { get; private set; } = EngineState.Idle;
@@ -91,6 +92,7 @@ internal sealed class HuntEngine
         queue.Clear();
         patrol.Clear();
         currentPatrolPoint = null;
+        currentTargetPosition = null;
         zoneReadySince = null;
         current = null;
         State = EngineState.Idle;
@@ -119,7 +121,7 @@ internal sealed class HuntEngine
             // A recorded HuntHelper train is intentionally trusted as the A-rank source. Entries marked dead are filtered above.
             queue.Enqueue(new HuntTarget(
                 mark.MobId, mark.Name, mark.TerritoryId, mark.MapId, 0,
-                HuntKind.ARank, 0, 0, 1, 0, mark.Position));
+                HuntKind.ARank, 0, 0, 1, 0, new[] { mark.Position }));
         }
     }
 
@@ -127,6 +129,7 @@ internal sealed class HuntEngine
     {
         patrol.Clear();
         currentPatrolPoint = null;
+        currentTargetPosition = null;
 
         if (!queue.TryDequeue(out current))
         {
@@ -177,7 +180,7 @@ internal sealed class HuntEngine
         var live = TargetScanner.Find(current.MobId, cfg.SearchRadius);
         if (live is not null)
         {
-            Engage(live);
+            ApproachOrEngage(live);
             return;
         }
 
@@ -191,11 +194,13 @@ internal sealed class HuntEngine
         patrol.Clear();
         currentPatrolPoint = null;
 
-        if (current.MapPosition is { } known)
+        if (current.MapPositions is { Count: > 0 } knownPositions)
         {
-            // First check the known bill/train region, then a small spiral around it.
-            foreach (var p in BuildLocalMapPattern(known, cfg.PatrolMapStep))
-                AddPatrolPoint(p, map.Value);
+            // Check every known spawn cluster before beginning the full-map fallback.
+            // Keeping each cluster's points together lets the scanner sweep it locally.
+            foreach (var known in knownPositions)
+                foreach (var p in BuildLocalMapPattern(known, cfg.PatrolMapStep))
+                    AddPatrolPoint(p, map.Value);
         }
 
         // Elite marks can be at many spawn locations. Daily coordinates can also be stale or crowded,
@@ -220,7 +225,9 @@ internal sealed class HuntEngine
     private static IEnumerable<Vector2> BuildLocalMapPattern(Vector2 center, float step)
     {
         yield return center;
-        var d = Math.Clamp(step, 2.5f, 7f);
+        // A tighter first ring keeps the player inside a spawn cluster. The previous
+        // 2.5-map-unit minimum could jump from the center to the edge of a mob group.
+        var d = Math.Clamp(step / 3f, 1.0f, 2.0f);
         for (var ring = 1; ring <= 2; ring++)
         {
             var r = d * ring;
@@ -347,8 +354,22 @@ internal sealed class HuntEngine
         var obj = TargetScanner.Find(current.MobId, cfg.SearchRadius);
         if (obj is not null && State is EngineState.Patrolling or EngineState.Searching or EngineState.Navigating)
         {
-            nav.Stop();
-            Engage(obj);
+            ApproachOrEngage(obj);
+            return;
+        }
+
+        if (State == EngineState.Navigating)
+        {
+            if ((now - stateSince).TotalSeconds > cfg.NavigationTimeoutSeconds)
+            {
+                nav.Stop();
+                PrepareSearch();
+            }
+            else if (!nav.IsBusy())
+            {
+                // The mob may have moved or despawned while we approached it.
+                PrepareSearch();
+            }
             return;
         }
 
@@ -431,6 +452,37 @@ internal sealed class HuntEngine
         stateSince = DateTime.UtcNow;
     }
 
+    private void ApproachOrEngage(Dalamud.Game.ClientState.Objects.Types.IGameObject obj)
+    {
+        if (current is null || Service.ObjectTable.LocalPlayer is not { } player) return;
+
+        Service.TargetManager.Target = obj;
+        var distance = Vector3.Distance(player.Position, obj.Position);
+        if (distance <= cfg.ApproachRange)
+        {
+            Engage(obj);
+            return;
+        }
+
+        // Do not restart the same path every frame while the scanner can see the mob.
+        if (State == EngineState.Navigating && currentTargetPosition is { } previous &&
+            Vector3.DistanceSquared(previous, obj.Position) < 9f && nav.IsBusy())
+            return;
+
+        nav.Stop();
+        currentTargetPosition = obj.Position;
+        State = EngineState.Navigating;
+        Status = $"Approaching {current.Name} ({distance:F0} yalms away)";
+        stateSince = DateTime.UtcNow;
+
+        var fly = cfg.PreferFlying && Service.Condition[ConditionFlag.Mounted];
+        if (!nav.MoveTo(obj.Position, fly, cfg.ApproachRange))
+        {
+            Service.Log.Warning("Could not path into combat range of {Name}; resuming patrol.", current.Name);
+            PrepareSearch();
+        }
+    }
+
     private void FailOrRetry(string reason)
     {
         if (current is null) return;
@@ -438,6 +490,7 @@ internal sealed class HuntEngine
         rsr.Stop(current.MobId);
         patrol.Clear();
         currentPatrolPoint = null;
+        currentTargetPosition = null;
         retries++;
 
         if (retries <= cfg.MaxRetriesPerTarget)

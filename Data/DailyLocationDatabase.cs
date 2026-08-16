@@ -33,5 +33,26 @@ internal static class DailyLocationDatabase
         [13121] = new(33.1f, 34.4f), [13137] = new(12.0f, 18.7f), [13133] = new(30.5f, 17.1f),
     };
 
-    public static bool TryGet(uint mobId, out Vector2 position) => Positions.TryGetValue(mobId, out position);
+    // Extra community-known spawn clusters. The first entry in Positions remains the
+    // preferred fast path; these are searched before falling back to a full-map patrol.
+    private static readonly Dictionary<uint, Vector2[]> AdditionalPositions = new()
+    {
+        // Alpaca groups in Urqopacha. Hunt Buddy lists more than one cluster, and the
+        // old (32.0, 13.4) point can leave navigation at the edge of the northern group.
+        [13079] = [new(32.0f, 14.9f), new(12.5f, 8.8f)],
+    };
+
+    public static IReadOnlyList<Vector2> GetPositions(uint mobId)
+    {
+        if (!Positions.TryGetValue(mobId, out var primary))
+            return Array.Empty<Vector2>();
+
+        if (!AdditionalPositions.TryGetValue(mobId, out var additional))
+            return new[] { primary };
+
+        var result = new Vector2[additional.Length + 1];
+        result[0] = primary;
+        additional.CopyTo(result, 1);
+        return result;
+    }
 }
