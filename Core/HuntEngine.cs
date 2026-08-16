@@ -31,6 +31,7 @@ internal sealed class HuntEngine
     private Vector3? currentPatrolPoint;
     private Vector3? currentTargetPosition;
     private DateTime? zoneReadySince;
+    private DateTime lastAttackAttempt;
 
     public EngineState State { get; private set; } = EngineState.Idle;
     public string Status { get; private set; } = "Idle";
@@ -428,6 +429,15 @@ internal sealed class HuntEngine
                 return;
             }
 
+            // RSR may wait for combat to be initiated even after Auto mode is enabled.
+            // Retry the universal auto-attack action through the post-dismount lock.
+            if (!Service.Condition[ConditionFlag.InCombat] && (now - lastAttackAttempt).TotalSeconds >= 1)
+            {
+                lastAttackAttempt = now;
+                if (!CombatController.TryAutoAttack(target))
+                    Service.Log.Warning("Auto-attack initiation was unavailable for {Name}; retrying.", current.Name);
+            }
+
             if ((now - stateSince).TotalSeconds > cfg.CombatTimeoutSeconds)
             {
                 rsr.Stop(current.MobId);
@@ -463,11 +473,16 @@ internal sealed class HuntEngine
         if (current is null) return;
         nav.Stop();
         Service.TargetManager.Target = obj;
-        if (!rsr.StartManual(current.MobId))
+        if (!rsr.StartAutoBig(current.MobId))
         {
             FailOrRetry("Could not enable RotationSolverReborn");
             return;
         }
+        lastAttackAttempt = DateTime.UtcNow;
+        if (!CombatController.TryAutoAttack(obj))
+            Service.Log.Warning("Initial auto-attack was unavailable for {Name}; it will be retried.", current.Name);
+        else
+            Service.Log.Information("Started RotationSolverReborn Auto (Big) mode and initiated combat with {Name}.", current.Name);
         State = EngineState.Fighting;
         Status = $"Fighting {current.Name}";
         stateSince = DateTime.UtcNow;

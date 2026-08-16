@@ -25,7 +25,7 @@ See [CUSTOM_REPOSITORY.md](CUSTOM_REPOSITORY.md) for the one-time GitHub setup a
 - B-ranks use a full-map patrol because an elite mark can occupy many spawn points.
 - Continuously scans `IObjectTable` by `NameId`; once visible, selects the target and navigates into the configured combat range.
 - Uses vnavmesh to snap patrol points to the navmesh and path to them.
-- Approaches and dismounts near the mob before starting RotationSolverReborn in Manual mode; stops RSR after the kill or timeout.
+- Approaches and dismounts near the mob, initiates auto-attack, and starts RotationSolverReborn in Auto (Big) mode; stops RSR after the kill or timeout.
 - Verifies daily completion from the game's hunt-bill kill counter rather than assuming a despawn means credit.
 - Optionally imports the currently recorded HuntHelper train through `HH.GetTrainList` and queues its live entries as A-rank targets.
 - Stops on player death rather than automatically attempting resurrection.
