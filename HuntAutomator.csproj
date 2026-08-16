@@ -4,7 +4,7 @@
     <Author>HuntAutomator contributors</Author>
     <Name>Hunt Automator</Name>
     <Punchline>Orchestrates hunt bills, hunt routing, and combat.</Punchline>
-    <Description>Automates selected hunt workflows using vnavmesh, RotationSolverReborn, Teleporter, and optional HuntHelper integration.</Description>
+    <Description>Automates selected hunt workflows using vnavmesh, RotationSolverReborn, Lifestream, and optional HuntHelper integration.</Description>
     <Tags>hunt;automation;vnavmesh;combat</Tags>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>

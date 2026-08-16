@@ -4,7 +4,7 @@
     "Name": "Hunt Automator",
     "InternalName": "HuntAutomator",
     "AssemblyVersion": "0.2.0.0",
-    "Description": "Automates FFXIV hunt bills using vnavmesh, RotationSolverReborn, Teleporter, and optional HuntHelper integration.",
+    "Description": "Automates FFXIV hunt bills using Lifestream, vnavmesh, RotationSolverReborn, and optional HuntHelper integration.",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 15,
     "Punchline": "Automated hunt bill orchestration.",

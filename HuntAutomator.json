@@ -3,7 +3,7 @@
   "Name": "Hunt Automator",
   "InternalName": "HuntAutomator",
   "Punchline": "Orchestrates hunt bills, hunt routing, and combat.",
-  "Description": "Automates selected daily hunt bills, weekly B-ranks, and optional HuntHelper A-rank trains using vnavmesh and RotationSolverReborn.",
+  "Description": "Automates selected daily hunt bills, weekly B-ranks, and optional HuntHelper A-rank trains using Lifestream, vnavmesh, and RotationSolverReborn.",
   "ApplicableVersion": "any",
   "DalamudApiLevel": 15,
   "Tags": [

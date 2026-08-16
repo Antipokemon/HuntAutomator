@@ -11,7 +11,7 @@ namespace HuntAutomator.Core;
 public enum EngineState
 {
     Idle, Planning, Teleporting, WaitingForZone, Navigating, Searching,
-    Mounting, Dismounting, Patrolling, Fighting, Confirming, Recovering, Finished, Error
+    Mounting, MountingToTarget, Dismounting, Patrolling, Fighting, Confirming, Recovering, Finished, Error
 }
 
 internal sealed class HuntEngine
@@ -19,7 +19,7 @@ internal sealed class HuntEngine
     private readonly Configuration cfg;
     private readonly VNavmeshIpc nav = new();
     private readonly RotationSolverIpc rsr = new();
-    private readonly TeleporterIpc tp = new();
+    private readonly LifestreamIpc lifestream = new();
     private readonly HuntHelperIpc hh = new();
     private readonly Queue<HuntTarget> queue = new();
     private readonly Queue<Vector3> patrol = new();
@@ -32,6 +32,7 @@ internal sealed class HuntEngine
     private Vector3? currentTargetPosition;
     private DateTime? zoneReadySince;
     private DateTime lastAttackAttempt;
+    private DateTime lastMountAttempt;
 
     public EngineState State { get; private set; } = EngineState.Idle;
     public string Status { get; private set; } = "Idle";
@@ -161,9 +162,9 @@ internal sealed class HuntEngine
             Status = $"Teleporting for {current.Name}";
             stateSince = DateTime.UtcNow;
             zoneReadySince = null;
-            if (!tp.TeleportToTerritory(current.TerritoryId))
+            if (!lifestream.TeleportToTerritory(current.TerritoryId))
             {
-                FailOrRetry("No usable aetheryte / Teleporter IPC failed");
+                FailOrRetry("No usable aetheryte / Lifestream IPC failed");
                 return;
             }
             State = EngineState.WaitingForZone;
@@ -352,6 +353,32 @@ internal sealed class HuntEngine
             return;
         }
 
+        if (State == EngineState.MountingToTarget)
+        {
+            var visibleTarget = TargetScanner.Find(current.MobId, cfg.SearchRadius);
+            if (Service.Condition[ConditionFlag.Mounted])
+            {
+                if (visibleTarget is not null)
+                    ApproachOrEngage(visibleTarget);
+                else
+                    PrepareSearch();
+            }
+            else if ((now - stateSince).TotalSeconds > 8)
+            {
+                Service.Log.Warning("Could not mount to approach {Name}; using a ground route.", current.Name);
+                if (visibleTarget is not null)
+                    StartTargetApproach(visibleTarget, false);
+                else
+                    PrepareSearch();
+            }
+            else if ((now - lastMountAttempt).TotalSeconds >= 1.5)
+            {
+                lastMountAttempt = now;
+                MountController.TryMount();
+            }
+            return;
+        }
+
         if (State == EngineState.Dismounting)
         {
             if (!Service.Condition[ConditionFlag.Mounted])
@@ -494,6 +521,24 @@ internal sealed class HuntEngine
 
         Service.TargetManager.Target = obj;
         var distance = Vector3.Distance(player.Position, obj.Position);
+
+        // A visible target bypasses patrol-point mounting. Mount explicitly when the
+        // next required copy of the same mob is far enough away to benefit from flight.
+        if (cfg.PreferFlying && distance > 25f &&
+            !Service.Condition[ConditionFlag.Mounted] &&
+            !Service.Condition[ConditionFlag.InCombat])
+        {
+            nav.Stop();
+            currentTargetPosition = obj.Position;
+            State = EngineState.MountingToTarget;
+            Status = $"Mounting to approach {current.Name} ({distance:F0} yalms away)";
+            stateSince = DateTime.UtcNow;
+            lastMountAttempt = stateSince;
+            if (!MountController.TryMount())
+                Service.Log.Information("Waiting to mount for distant {Name} target.", current.Name);
+            return;
+        }
+
         if (distance <= cfg.ApproachRange)
         {
             if (Service.Condition[ConditionFlag.Mounted])
@@ -517,13 +562,20 @@ internal sealed class HuntEngine
             Vector3.DistanceSquared(previous, obj.Position) < 9f && nav.IsBusy())
             return;
 
+        var fly = cfg.PreferFlying && Service.Condition[ConditionFlag.Mounted];
+        StartTargetApproach(obj, fly);
+    }
+
+    private void StartTargetApproach(Dalamud.Game.ClientState.Objects.Types.IGameObject obj, bool fly)
+    {
+        if (current is null || Service.ObjectTable.LocalPlayer is not { } player) return;
+
         nav.Stop();
         currentTargetPosition = obj.Position;
         State = EngineState.Navigating;
-        Status = $"Approaching {current.Name} ({distance:F0} yalms away)";
+        Status = $"Approaching {current.Name} ({Vector3.Distance(player.Position, obj.Position):F0} yalms away){(fly ? " by air" : " on foot")}";
         stateSince = DateTime.UtcNow;
 
-        var fly = cfg.PreferFlying && Service.Condition[ConditionFlag.Mounted];
         if (!nav.MoveTo(obj.Position, fly, cfg.ApproachRange))
         {
             Service.Log.Warning("Could not path into combat range of {Name}; resuming patrol.", current.Name);

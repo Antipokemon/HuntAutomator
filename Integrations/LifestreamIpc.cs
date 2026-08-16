@@ -3,9 +3,10 @@ using Lumina.Excel.Sheets;
 
 namespace HuntAutomator.Integrations;
 
-internal sealed class TeleporterIpc
+internal sealed class LifestreamIpc
 {
-    private readonly ICallGateSubscriber<uint, byte, bool> teleport = Service.PluginInterface.GetIpcSubscriber<uint, byte, bool>("Teleport");
+    private readonly ICallGateSubscriber<uint, byte, bool> teleport =
+        Service.PluginInterface.GetIpcSubscriber<uint, byte, bool>("Lifestream.Teleport");
 
     public bool TeleportToTerritory(uint territoryId)
     {
@@ -19,7 +20,7 @@ internal sealed class TeleporterIpc
         }
         catch (Exception ex)
         {
-            Service.Log.Warning(ex, "Teleporter IPC failed");
+            Service.Log.Warning(ex, "Lifestream teleport IPC failed");
             return false;
         }
     }

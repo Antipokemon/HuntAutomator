@@ -20,10 +20,11 @@ See [CUSTOM_REPOSITORY.md](CUSTOM_REPOSITORY.md) for the one-time GitHub setup a
 
 - Reads currently accepted daily clan/mark bills directly from the game's `MobHunt` state and Lumina `MobHuntOrder` data.
 - Reads weekly elite/B-rank bills the same way.
-- Groups targets into a queue and automatically changes zones with Teleporter IPC.
+- Groups targets into a queue and automatically changes zones with Lifestream IPC.
 - Searches every bundled spawn cluster for a daily mark as a fast path, then falls back to a deterministic full-map patrol.
 - B-ranks use a full-map patrol because an elite mark can occupy many spawn points.
 - Continuously scans `IObjectTable` by `NameId`; once visible, selects the target and navigates into the configured combat range.
+- Mounts for distant visible copies of the same daily target instead of approaching the next kill entirely on foot.
 - Uses vnavmesh to snap patrol points to the navmesh and path to them.
 - Approaches and dismounts near the mob, initiates auto-attack, and starts RotationSolverReborn in Auto (Big) mode; stops RSR after the kill or timeout.
 - Verifies daily completion from the game's hunt-bill kill counter rather than assuming a despawn means credit.
@@ -37,7 +38,7 @@ Required:
 - Dalamud API 15
 - vnavmesh
 - RotationSolverReborn
-- TeleporterPlugin (`Teleport` IPC)
+- Lifestream (`Lifestream.Teleport` IPC)
 
 Optional:
 
@@ -64,4 +65,4 @@ CI follows the current official SamplePlugin pattern and downloads the latest Da
 
 ## Development status
 
-The source was designed against APIs inspected in August 2026. Third-party IPC and commands can change. The project should be integration-tested in FFXIV before unattended use, especially after updates to Dalamud, vnavmesh, RotationSolverReborn, TeleporterPlugin, or HuntHelper.
+The source was designed against APIs inspected in August 2026. Third-party IPC and commands can change. The project should be integration-tested in FFXIV before unattended use, especially after updates to Dalamud, vnavmesh, RotationSolverReborn, Lifestream, or HuntHelper.
