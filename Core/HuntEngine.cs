@@ -11,7 +11,7 @@ namespace HuntAutomator.Core;
 public enum EngineState
 {
     Idle, Planning, Teleporting, WaitingForZone, Navigating, Searching,
-    Mounting, Patrolling, Fighting, Confirming, Recovering, Finished, Error
+    Mounting, Dismounting, Patrolling, Fighting, Confirming, Recovering, Finished, Error
 }
 
 internal sealed class HuntEngine
@@ -351,6 +351,27 @@ internal sealed class HuntEngine
             return;
         }
 
+        if (State == EngineState.Dismounting)
+        {
+            if (!Service.Condition[ConditionFlag.Mounted])
+            {
+                var dismountedTarget = TargetScanner.Find(current.MobId, cfg.SearchRadius);
+                if (dismountedTarget is not null)
+                    ApproachOrEngage(dismountedTarget);
+                else
+                    PrepareSearch();
+            }
+            else if ((now - stateSince).TotalSeconds > 5)
+            {
+                // Dismount can briefly be unavailable while vnavmesh finishes landing.
+                Status = $"Waiting to dismount near {current.Name}";
+                stateSince = now;
+                if (!MountController.TryDismount())
+                    Service.Log.Warning("Dismount action was unavailable near {Name}; retrying.", current.Name);
+            }
+            return;
+        }
+
         var obj = TargetScanner.Find(current.MobId, cfg.SearchRadius);
         if (obj is not null && State is EngineState.Patrolling or EngineState.Searching or EngineState.Navigating)
         {
@@ -460,6 +481,18 @@ internal sealed class HuntEngine
         var distance = Vector3.Distance(player.Position, obj.Position);
         if (distance <= cfg.ApproachRange)
         {
+            if (Service.Condition[ConditionFlag.Mounted])
+            {
+                nav.Stop();
+                currentTargetPosition = obj.Position;
+                State = EngineState.Dismounting;
+                Status = $"Dismounting to fight {current.Name}";
+                stateSince = DateTime.UtcNow;
+                if (!MountController.TryDismount())
+                    Service.Log.Warning("Initial dismount action was unavailable near {Name}; waiting to retry.", current.Name);
+                return;
+            }
+
             Engage(obj);
             return;
         }
